@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
         File kernelFile = new File(getFilesDir(), "webview_kernel.apk");
         if (kernelFile.exists()) {
             try {
-                WebViewUpgrade.upgrade(new UpgradeFileSource(kernelFile.getAbsolutePath()));
+                WebViewUpgrade.upgrade(new UpgradeFileSource(MainActivity.this, kernelFile));
             } catch (Throwable t) {
                 Toast.makeText(this, "内核加载失败，请重新选择", Toast.LENGTH_LONG).show();
             }
