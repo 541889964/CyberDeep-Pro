@@ -6,7 +6,7 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies {
-    implementation("io.github.jonanorman.android.webviewup:core:0.1.0") {
+    implementation "io.github.jonanorman.android.webviewup:core:0.1.0"
         exclude group: "androidx.appcompat", module: "appcompat"
     }
     implementation 'androidx.appcompat:appcompat:1.6.1'
