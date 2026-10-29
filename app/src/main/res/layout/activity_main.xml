@@ -1,0 +1,19 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/bg_main">
+    <!-- 网页版底层 -->
+    <WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" />
+    
+    <!-- 原生 UI 层 -->
+    <LinearLayout android:id="@+id/nativeLayout" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@color/bg_main" android:visibility="gone">
+        <RelativeLayout android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/bg_surface" android:elevation="4dp">
+            <TextView android:id="@+id/tvTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerInParent="true" android:text="CYBER DEEP (长按切换网页)" android:textColor="#00E5FF" android:textSize="16sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/tvStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:layout_centerVertical="true" android:text="就绪" android:textColor="@color/text_sub" android:padding="12dp" android:textSize="12sp"/>
+        </RelativeLayout>
+        
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerView" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:padding="12dp" android:clipToPadding="false"/>
+        
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="12dp" android:background="@color/bg_surface" android:elevation="8dp">
+            <EditText android:id="@+id/etInput" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:background="@drawable/bg_input" android:hint="输入指令..." android:textColor="#FFF" android:textColorHint="@color/text_sub" android:paddingStart="16dp" android:paddingEnd="16dp" />
+            <ImageButton android:id="@+id/btnSend" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_send" android:scaleType="centerInside"/>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
