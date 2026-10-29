@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.CyberDeep" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:statusBarColor">@color/bg_main</item>
+        <item name="android:windowBackground">@color/bg_main</item>
+    </style>
+</resources>
