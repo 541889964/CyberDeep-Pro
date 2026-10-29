@@ -28,8 +28,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.jonanorman.android.webviewup.WebViewUpgrade;
-import io.github.jonanorman.android.webviewup.source.UpgradeFileSource;
+import com.norman.webviewup.lib.WebViewUpgrade;
+import com.norman.webviewup.lib.source.UpgradeFileSource;
 
 public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
