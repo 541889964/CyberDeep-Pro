@@ -1,6 +1,9 @@
 package com.cyber.deep;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,12 +17,19 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.*;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import org.json.JSONObject;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import io.github.jonanorman.android.webviewup.WebViewUpgrade;
+import io.github.jonanorman.android.webviewup.source.UpgradeFileSource;
 
 public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
@@ -30,13 +40,12 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isRunning = false;
     private boolean isPageHooked = false;
+    private static final int REQ_PICK_KERNEL = 1001;
 
     private MsgAdapter adapter;
     private final List<Msg> msgList = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final StringBuilder sseBuffer = new StringBuilder();
-    
-    // 防抖节流机制
     private final StringBuilder pendingAiText = new StringBuilder();
     private boolean isUiUpdatePending = false;
 
@@ -44,6 +53,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 1. 核心：在 setContentView 之前，检查并加载本地 WebView 内核
+        File kernelFile = new File(getFilesDir(), "webview_kernel.apk");
+        if (kernelFile.exists()) {
+            try {
+                WebViewUpgrade.upgrade(new UpgradeFileSource(kernelFile.getAbsolutePath()));
+            } catch (Throwable t) {
+                Toast.makeText(this, "内核加载失败，请重新选择", Toast.LENGTH_LONG).show();
+            }
+        } else {
+            // 没有内核，弹窗提示去选择
+            mainHandler.post(() -> showKernelPickerDialog());
+        }
+
         setContentView(R.layout.activity_main);
 
         recyclerView = findViewById(R.id.recyclerView);
@@ -56,22 +79,19 @@ public class MainActivity extends AppCompatActivity {
 
         adapter = new MsgAdapter();
         LinearLayoutManager lm = new LinearLayoutManager(this);
-        lm.setStackFromEnd(true); // 列表从底部开始排版
+        lm.setStackFromEnd(true);
         recyclerView.setLayoutManager(lm);
         recyclerView.setAdapter(adapter);
 
         initWebView();
 
-        // 长按顶部栏，无缝切换 网页登录 和 原生界面
         tvTitle.setOnLongClickListener(v -> {
             if (webView.getVisibility() == View.VISIBLE) {
                 webView.setVisibility(View.GONE);
                 nativeLayout.setVisibility(View.VISIBLE);
-                Toast.makeText(this, "已切换到原生界面", Toast.LENGTH_SHORT).show();
             } else {
                 webView.setVisibility(View.VISIBLE);
                 nativeLayout.setVisibility(View.GONE);
-                Toast.makeText(this, "请刷新或重新登录", Toast.LENGTH_SHORT).show();
             }
             return true;
         });
@@ -91,27 +111,73 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void initWebView() {
-        WebSettings s = webView.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-        // 伪装火狐 UA
-        s.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile; rv:115.0) Gecko/115.0 Firefox/115.0");
+    // 弹出文件选择器
+    private void showKernelPickerDialog() {
+        new AlertDialog.Builder(this)
+            .setTitle("缺少浏览器内核")
+            .setMessage("系统 WebView 已被删除。请选择一个本地的 WebView 内核 APK（如 Chrome 或 LineageOS WebView）来启动应用。")
+            .setPositiveButton("去选择", (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.setType("application/vnd.android.package-archive");
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                startActivityForResult(intent, REQ_PICK_KERNEL);
+            })
+            .setCancelable(false)
+            .show();
+    }
 
-        webView.addJavascriptInterface(new JsBridge(), "__bridge");
-
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                if (url.contains("chat.deepseek.com")) {
-                    injectHookJs(view);
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PICK_KERNEL && resultCode == Activity.RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            new Thread(() -> {
+                try (InputStream in = getContentResolver().openInputStream(uri);
+                     FileOutputStream out = new FileOutputStream(new File(getFilesDir(), "webview_kernel.apk"))) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = in.read(buffer)) > 0) {
+                        out.write(buffer, 0, len);
+                    }
+                    mainHandler.post(() -> {
+                        Toast.makeText(this, "内核导入成功，正在重启...", Toast.LENGTH_SHORT).show();
+                        // 重启 App 以应用内核
+                        Intent i = getBaseContext().getPackageManager().getLaunchIntentForPackage(getBaseContext().getPackageName());
+                        i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        startActivity(i);
+                        finish();
+                    });
+                } catch (Exception e) {
+                    mainHandler.post(() -> Toast.makeText(this, "导入失败: " + e.getMessage(), Toast.LENGTH_LONG).show());
                 }
-            }
-        });
+            }).start();
+        }
+    }
 
-        webView.loadUrl("https://chat.deepseek.com");
+    private void initWebView() {
+        try {
+            WebSettings s = webView.getSettings();
+            s.setJavaScriptEnabled(true);
+            s.setDomStorageEnabled(true);
+            s.setDatabaseEnabled(true);
+            s.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile; rv:115.0) Gecko/115.0 Firefox/115.0");
+
+            webView.addJavascriptInterface(new JsBridge(), "__bridge");
+
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    if (url.contains("chat.deepseek.com")) {
+                        injectHookJs(view);
+                    }
+                }
+            });
+
+            webView.loadUrl("https://chat.deepseek.com");
+        } catch (Throwable t) {
+            mainHandler.post(() -> tvStatus.setText("内核加载异常，请重启 App"));
+        }
     }
 
     private void injectHookJs(WebView view) {
@@ -194,7 +260,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // 核心优化：每 50ms 合并一次 UI 刷新，防止打字太快卡顿
     private void scheduleUiUpdate() {
         if (!isUiUpdatePending) {
             isUiUpdatePending = true;
